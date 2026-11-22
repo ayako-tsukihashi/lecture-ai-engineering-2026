@@ -135,7 +135,7 @@ def search_materials(query: str) -> str:
 
 
 def browse_tree(node_id: str | None = None) -> str:
-    """目次とページの先頭文を返す。ページIDを指定すると全文を返す。
+    """目次とページの短い本文抜粋を返す。ページIDを指定すると全文を返す。
 
     最初はnode_idを省略する。続いて返されたIDを指定して目次をたどる。
     """

@@ -48,9 +48,42 @@ def load_pages(source: Path = RAG_SOURCE) -> list[dict]:
                               "page": page["page"], "content": page["content"]})
     return pages
 
+def _tree_preview(page: dict, limit: int = 180) -> str:
+    """見出しなどの重複を除き、ページ選択用の短い本文抜粋を作る。"""
+    def normalize(value: str) -> str:
+        return re.sub(r"\s+", "", value)
+
+    headings = {
+        normalize(page.get(key, ""))
+        for key in ("document_title", "section", "title")
+    } - {""}
+
+    kept = []
+    for raw in page.get("content", "").splitlines():
+        line = " ".join(raw.split())
+        if not line or line.startswith(("出典", "©", "arXiv:")):
+            continue
+
+        key = normalize(line)
+        without_counter = re.sub(r"^\d+/\d+", "", key)
+
+        if key in headings or without_counter in headings:
+            continue
+
+        if re.fullmatch(r"\d+", key):
+            continue
+
+        if line not in kept:
+            kept.append(line)
+
+    text = " ".join(kept)
+    if not text:
+        text = " ".join(page.get("content", "").split())
+
+    return text if len(text) <= limit else text[:limit - 1] + "…"
 
 def browse_tree(node_id: str | None = None) -> dict:
-    """直下のページは先頭文、指定したページ自身は全文を返す。"""
+    """直下のページは短い本文抜粋、指定したページ自身は全文を返す。"""
     tree = json.loads(RAG_TREE.read_text(encoding="utf-8"))
     tree["children"] = [node for node in tree["children"] if node["id"] in RAG_DOCUMENT_IDS]
     node_id = node_id or tree["id"]
@@ -61,7 +94,7 @@ def browse_tree(node_id: str | None = None) -> dict:
         if node["kind"] == "page":
             info.update({key: value for key, value in pages[node["id"]].items() if key != "page_id"})
             if not full:
-                info["content"] = re.split(r"(?<=[。！？])|\n", info["content"].strip(), maxsplit=1)[0]
+                info["content"] = _tree_preview(info)
         return info
 
     remaining = [tree]
